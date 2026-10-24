@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="id" data-bs-theme="dark">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Monitoring Keamanan Gedung</title>
+
+  <!-- Bootstrap 5 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
+  <!-- Font Poppins -->
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    body {
+      font-family: 'Poppins', sans-serif;
+      min-height: 100vh;
+      background-color: #000;
+      background-image:
+        radial-gradient(circle at 10% 10%, rgba(13, 110, 253, 0.22) 0, transparent 35%),
+        radial-gradient(circle at 90% 85%, rgba(13, 110, 253, 0.18) 0, transparent 35%);
+      background-attachment: fixed;
+    }
+
+    .navbar {
+      background-color: #03060d;
+      border-bottom: 1px solid #14325c;
+    }
+
+    .navbar-toggler {
+      border-color: #14325c;
+    }
+
+    .offcanvas {
+      background-color: #080d17;
+      border-left: 1px solid #14325c;
+    }
+
+    .offcanvas-header {
+      border-bottom: 1px solid #14325c;
+    }
+
+    .card {
+      background-color: #080d17;
+      border: 1px solid #14325c;
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow: 0 0 18px rgba(13, 110, 253, 0.12);
+    }
+
+    .card-header {
+      background-color: #0b1424;
+      border-bottom: 1px solid #14325c;
+    }
+
+    .list-group-item {
+      background-color: transparent;
+      border-color: #14325c;
+    }
+
+    .angka {
+      font-size: 56px;
+      font-weight: 700;
+      color: #4da3ff;
+    }
+
+    .kotak-log {
+      max-height: 250px;
+      overflow-y: auto;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- Navbar -->
+  <nav class="navbar navbar-dark mb-4">
+    <div class="container">
+      <span class="navbar-brand mb-0 h1">Monitoring Keamanan Gedung</span>
+      <div class="d-flex align-items-center">
+        <span id="statusKoneksi" class="badge bg-secondary me-2">Menunggu data</span>
+        <span id="jam" class="text-white me-3"></span>
+        <!-- tombol garis tiga -->
+        <button class="navbar-toggler" type="button" data-bs-toggle="offcanvas" data-bs-target="#menuKontrol"
+          aria-controls="menuKontrol" aria-label="Buka menu kontrol">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Menu kontrol (muncul dari kanan) -->
+  <div class="offcanvas offcanvas-end" tabindex="-1" id="menuKontrol" aria-labelledby="judulMenu">
+    <div class="offcanvas-header">
+      <h5 class="offcanvas-title" id="judulMenu">Kontrol Perangkat</h5>
+      <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Tutup"></button>
+    </div>
+    <div class="offcanvas-body">
+      <label for="inputIP" class="form-label small">Alamat IP ESP32</label>
+      <div class="input-group mb-1">
+        <input type="text" class="form-control" id="inputIP" placeholder="contoh 192.168.1.23">
+        <button class="btn btn-primary" type="button" id="tombolIP">Simpan</button>
+      </div>
+
+
+      <p class="text-muted small">Geser tombol untuk menghidupkan atau mematikan perangkat di alat.</p>
+
+      <ul class="list-group list-group-flush">
+        <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+          <label for="swAsap" class="mb-0">Sensor Asap</label>
+          <div class="form-check form-switch mb-0">
+            <input class="form-check-input sw-alat" type="checkbox" role="switch" id="swAsap" data-alat="asap" checked>
+          </div>
+        </li>
+        <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+          <label for="swGetar" class="mb-0">Sensor Getar</label>
+          <div class="form-check form-switch mb-0">
+            <input class="form-check-input sw-alat" type="checkbox" role="switch" id="swGetar" data-alat="getar"
+              checked>
+          </div>
+        </li>
+        <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+          <label for="swBuzzer" class="mb-0">Buzzer</label>
+          <div class="form-check form-switch mb-0">
+            <input class="form-check-input sw-alat" type="checkbox" role="switch" id="swBuzzer" data-alat="buzzer"
+              checked>
+          </div>
+        </li>
+        <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+          <label for="swLed" class="mb-0">LED Kuning</label>
+          <div class="form-check form-switch mb-0">
+            <input class="form-check-input sw-alat" type="checkbox" role="switch" id="swLed" data-alat="led" checked>
+          </div>
+        </li>
+      </ul>
+
+      <div id="pesanKontrol" class="small text-muted mt-3"></div>
+    </div>
+  </div>
+
+  <div class="container">
+
+    <!-- Kartu sensor -->
+    <div class="row">
+
+      <!-- Getaran -->
+      <div class="col-md-6 mb-4">
+        <div class="card shadow-sm" id="kartuGetaran">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Getaran / Gempa</h5>
+            <span id="badgeGetaran" class="badge bg-primary">Normal</span>
+          </div>
+          <div class="card-body text-center">
+            <div class="angka"><span id="nilaiGetaran">0</span> <small class="fs-5">%</small></div>
+            <p id="ketGetaran" class="text-muted">Tidak terasa</p>
+            <canvas id="grafikGetaran" height="120"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Asap -->
+      <div class="col-md-6 mb-4">
+        <div class="card shadow-sm" id="kartuAsap">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Kadar Asap</h5>
+            <span id="badgeAsap" class="badge bg-primary">Normal</span>
+          </div>
+          <div class="card-body text-center">
+            <div class="angka"><span id="nilaiAsap">0</span> <small class="fs-5">%</small></div>
+            <p id="ketAsap" class="text-muted">Udara bersih</p>
+            <canvas id="grafikAsap" height="120"></canvas>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Catatan kejadian -->
+    <div class="card shadow-sm mb-4">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">Catatan Kejadian</h5>
+      </div>
+      <ul class="list-group list-group-flush kotak-log" id="log">
+        <li class="list-group-item text-muted" id="logKosong">Belum ada kejadian</li>
+      </ul>
+    </div>
+
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script>
+    /*
+      CATATAN YANG PERLU DIUBAH SAAT ALAT IoT SUDAH JADI
+      ---------------------------------------------------
+      1. IP ESP32    : tidak perlu edit kode, isi lewat kolom di menu
+                       garis tiga lalu klik Simpan (tersimpan di browser)
+                       IP dilihat di Serial Monitor, laptop dan ESP32
+                       harus satu WiFi
+      2. Data ESP32  : alamat http://IP/data membalas JSON
+                       {"asap": 12.5, "getaran": 30, "aktif": {...}}
+      3. Kontrol     : tombol di menu garis tiga memanggil
+                       http://IP/kontrol?alat=asap&status=1
+                       alat = asap / getar / buzzer / led, status 1 hidup 0 mati
+      4. batas...    : ambang batas disesuaikan dengan kode ESP32
+      5. instanceWA, nomorWA, tokenWA : isi ID instance, nomor tujuan, dan token WaAPI
+      6. Web harus tetap terbuka supaya WhatsApp bisa terkirim
+    */
+
+    var ipESP32 = '';
+    try { ipESP32 = localStorage.getItem('ipESP32') || ''; } catch (e) { }
+    function urlESP32() { return 'http://' + ipESP32; }
+    var waktuAmbil = 2000; // ambil data tiap 2 detik
+
+    var batasGetaranWaspada = 10;
+    var batasGetaranBahaya = 50;
+    var batasAsapWaspada = 10;
+    var batasAsapBahaya = 20;
+
+    var instanceWA = '106738';           // ID instance di WaAPI
+    var nomorWA = '6282267502256';       // nomor tujuan, pakai kode negara
+    var tokenWA = 'twwS1FirugoHCGBGhahRobwz7f3D95NBEfj89ijO3acf2802';
+    var jedaWA = 60000; // jeda antar pesan WA sejenis (1 menit)
+
+    // ------------------------------------------------------------
+
+    var getaran = 0;
+    var asap = 0;
+    var statusGetaran = 0; // 0 normal, 1 waspada, 2 bahaya, 3 sensor mati
+    var statusAsap = 0;
+    var waktuWAterakhir = {};
+    var alatTerputus = false;
+    var aktif = { asap: true, getar: true, buzzer: true, led: true };
+
+    var namaStatus = ['Normal', 'Waspada', 'Bahaya', 'Nonaktif'];
+    var warnaBadge = ['bg-primary', 'bg-warning text-dark', 'bg-danger', 'bg-secondary'];
+    var warnaKartu = ['', 'border-warning border-3', 'border-danger border-3', ''];
+
+    var namaAlat = { asap: 'Sensor asap', getar: 'Sensor getar', buzzer: 'Buzzer', led: 'LED kuning' };
+    var idSwitch = { asap: 'swAsap', getar: 'swGetar', buzzer: 'swBuzzer', led: 'swLed' };
+
+    // grafik
+    function buatGrafik(idCanvas, warna) {
+      var kosong = [];
+      for (var i = 0; i < 30; i++) kosong.push(0);
+      return new Chart(document.getElementById(idCanvas), {
+        type: 'line',
+        data: {
+          labels: kosong.map(function () { return ''; }),
+          datasets: [{ data: kosong.slice(), borderColor: warna, borderWidth: 2, pointRadius: 0, tension: 0.3 }]
+        },
+        options: {
+          animation: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { display: false },
+            y: { beginAtZero: true, suggestedMax: 100, grid: { color: '#14325c' }, ticks: { color: '#8aa4c2' } }
+          }
+        }
+      });
+    }
+    var grafikGetaran = buatGrafik('grafikGetaran', '#4da3ff');
+    var grafikAsap = buatGrafik('grafikAsap', '#00c3ff');
+
+    function tambahKeGrafik(grafik, nilai) {
+      var d = grafik.data.datasets[0].data;
+      d.push(nilai);
+      d.shift();
+      grafik.update();
+    }
+
+    // menentukan status dari nilai sensor
+    function cekStatus(nilai, waspada, bahaya, hidup) {
+      if (!hidup) return 3;
+      if (nilai >= bahaya) return 2;
+      if (nilai >= waspada) return 1;
+      return 0;
+    }
+
+    function keteranganGetaran(g) {
+      if (!aktif.getar) return 'Sensor dimatikan';
+      if (g < 1) return 'Tidak terasa';
+      if (g < 30) return 'Getaran ringan';
+      if (g < 50) return 'Getaran sedang, periksa area sekitar';
+      return 'Getaran kuat, kemungkinan gempa';
+    }
+
+    function keteranganAsap(p) {
+      if (!aktif.asap) return 'Sensor dimatikan';
+      if (p < 10) return 'Udara bersih';
+      if (p < 20) return 'Ada partikel di udara';
+      if (p < 50) return 'Asap terdeteksi';
+      return 'Kadar asap tinggi, kemungkinan kebakaran';
+    }
+
+    // menampilkan data ke halaman
+    function tampilkanData() {
+      document.getElementById('nilaiGetaran').textContent = Math.round(getaran);
+      document.getElementById('nilaiAsap').textContent = asap.toFixed(1);
+      document.getElementById('ketGetaran').textContent = keteranganGetaran(getaran);
+      document.getElementById('ketAsap').textContent = keteranganAsap(asap);
+
+      var sg = cekStatus(getaran, batasGetaranWaspada, batasGetaranBahaya, aktif.getar);
+      var sa = cekStatus(asap, batasAsapWaspada, batasAsapBahaya, aktif.asap);
+
+      ubahTampilan('Getaran', sg);
+      ubahTampilan('Asap', sa);
+
+      if (sg != statusGetaran) {
+        statusGetaran = sg;
+        statusBerubah('Getaran', Math.round(getaran) + ' %', sg);
+      }
+      if (sa != statusAsap) {
+        statusAsap = sa;
+        statusBerubah('Asap', asap.toFixed(1) + ' %', sa);
+      }
+    }
+
+    function ubahTampilan(nama, status) {
+      var badge = document.getElementById('badge' + nama);
+      badge.textContent = namaStatus[status];
+      badge.className = 'badge ' + warnaBadge[status];
+      document.getElementById('kartu' + nama).className = 'card shadow-sm ' + warnaKartu[status];
+    }
+
+    function statusBerubah(jenis, nilai, status) {
+      if (status == 0 || status == 3) return; // normal atau sensor mati tidak dicatat
+
+      // catat kejadian
+      var kejadian = (jenis == 'Getaran') ? 'Ada gempa' : 'Ada asap';
+      tambahLog(kejadian + ' (' + namaStatus[status] + ')', status == 2 ? 'danger' : 'warning');
+
+      // kirim WhatsApp hanya kalau bahaya
+      if (status == 2) {
+        var pesan = '*PERINGATAN BAHAYA*\n' +
+          'Jenis: ' + jenis + '\n' +
+          'Nilai: ' + nilai + '\n' +
+          'Waktu: ' + new Date().toLocaleString('id-ID') + '\n' +
+          'Segera evakuasi.';
+        kirimWA(pesan, jenis);
+      }
+    }
+
+    function tambahLog(teks, warna) {
+      var kosong = document.getElementById('logKosong');
+      if (kosong) kosong.remove();
+      var li = document.createElement('li');
+      li.className = 'list-group-item text-' + warna;
+      li.innerHTML = '<small class="text-muted me-2">' + new Date().toLocaleTimeString('id-ID') + '</small>' + teks;
+      document.getElementById('log').prepend(li);
+    }
+
+    // kirim WhatsApp lewat API WaAPI
+    async function kirimWA(pesan, jenis) {
+      if (tokenWA.indexOf('ISI_') == 0) {
+        console.log('Token WaAPI belum diisi di kode');
+        return;
+      }
+      if (Date.now() - (waktuWAterakhir[jenis] || 0) < jedaWA) {
+        console.log('WhatsApp ' + jenis.toLowerCase() + ' ditahan (jeda 1 menit)');
+        return;
+      }
+      waktuWAterakhir[jenis] = Date.now();
+
+      try {
+        var respon = await fetch('https://waapi.app/api/v1/instances/' + instanceWA + '/client/action/send-message', {
+          method: 'POST',
+          headers: {
+            'Authorization': 'Bearer ' + tokenWA,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify({ chatId: nomorWA + '@c.us', message: pesan })
+        });
+        var hasil = await respon.json();
+        if (!respon.ok) throw new Error('HTTP ' + respon.status);
+        if (hasil.data && hasil.data.status == 'error') throw new Error(hasil.data.message || 'ditolak');
+        console.log('WhatsApp terkirim ke ' + nomorWA);
+      } catch (e) {
+        console.log('WhatsApp gagal: ' + e.message);
+      }
+    }
+
+    // samakan posisi saklar dengan kondisi di alat
+    function sinkronSwitch() {
+      for (var alat in idSwitch) {
+        document.getElementById(idSwitch[alat]).checked = aktif[alat];
+      }
+    }
+
+    // kirim perintah hidup/mati ke ESP32
+    async function kirimKontrol(alat, nyala, saklar) {
+      var pesan = document.getElementById('pesanKontrol');
+      try {
+        var respon = await fetch(urlESP32() + '/kontrol?alat=' + alat + '&status=' + (nyala ? 1 : 0));
+        var data = await respon.json();
+        aktif = data.aktif;
+        pesan.textContent = '';
+        tambahLog(namaAlat[alat] + (nyala ? ' dihidupkan' : ' dimatikan'), 'info');
+        tampilkanData();
+      } catch (e) {
+        saklar.checked = !nyala; // balikkan lagi karena perintah gagal
+        pesan.textContent = 'Gagal mengirim perintah, alat tidak merespons.';
+      }
+    }
+
+    var semuaSaklar = document.querySelectorAll('.sw-alat');
+    semuaSaklar.forEach(function (sw) {
+      sw.addEventListener('change', function () {
+        kirimKontrol(sw.dataset.alat, sw.checked, sw);
+      });
+    });
+
+    // ambil data dari ESP32
+    async function ambilData() {
+      var badge = document.getElementById('statusKoneksi');
+      if (!ipESP32) {
+        badge.textContent = 'IP belum diisi';
+        badge.className = 'badge bg-secondary me-2';
+        return;
+      }
+      try {
+        var respon = await fetch(urlESP32() + '/data');
+        var data = await respon.json();
+        getaran = Number(data.getaran) || 0;
+        asap = Number(data.asap) || 0;
+        if (data.aktif) {
+          aktif = data.aktif;
+          sinkronSwitch();
+        }
+
+        badge.textContent = 'Alat terhubung';
+        badge.className = 'badge bg-primary me-2';
+        if (alatTerputus) {
+          alatTerputus = false;
+          console.log('Koneksi ke alat pulih');
+        }
+      } catch (e) {
+        badge.textContent = 'Alat tidak merespons';
+        badge.className = 'badge bg-danger me-2';
+        if (!alatTerputus) {
+          alatTerputus = true;
+          console.log('Data tidak masuk: ' + e.message);
+        }
+        return;
+      }
+
+      tambahKeGrafik(grafikGetaran, getaran);
+      tambahKeGrafik(grafikAsap, asap);
+      tampilkanData();
+    }
+
+    // input IP
+    var inputIP = document.getElementById('inputIP');
+    inputIP.value = ipESP32;
+    document.getElementById('tombolIP').addEventListener('click', function () {
+      var ip = inputIP.value.trim().replace('http://', '').replace(/\/+$/, '');
+      if (!ip) return;
+      ipESP32 = ip;
+      try { localStorage.setItem('ipESP32', ip); } catch (e) { }
+      document.getElementById('pesanKontrol').textContent = 'IP disimpan: ' + ip;
+      ambilData();
+    });
+    if (!ipESP32) {
+      new bootstrap.Offcanvas(document.getElementById('menuKontrol')).show();
+    }
+
+    // jam
+    setInterval(function () {
+      document.getElementById('jam').textContent = new Date().toLocaleTimeString('id-ID');
+    }, 1000);
+
+    ambilData();
+    setInterval(ambilData, waktuAmbil);
+  </script>
+
+</body>
+
+</html>
